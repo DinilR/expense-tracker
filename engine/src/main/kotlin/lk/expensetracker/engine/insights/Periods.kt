@@ -84,6 +84,15 @@ data class ChartBucket(val label: String, val expenseMinor: Long, val incomeMino
 
 data class CategoryShare(val category: String, val amountMinor: Long, val count: Int, val share: Float)
 
+/** Spending in a category this period compared with the previous one. */
+data class CategoryChange(val category: String, val currentMinor: Long, val previousMinor: Long) {
+    val deltaMinor: Long get() = currentMinor - previousMinor
+    /** 0.45 = 45% more; null when there was nothing to compare with. */
+    val fraction: Double? get() = previousMinor.takeIf { it > 0 }?.let { deltaMinor.toDouble() / it }
+    val isNew: Boolean get() = previousMinor == 0L && currentMinor > 0
+    val stopped: Boolean get() = currentMinor == 0L && previousMinor > 0
+}
+
 data class PeriodReport(
     val period: Period,
     val totals: LedgerMath.Totals,
@@ -99,6 +108,10 @@ data class PeriodReport(
     val dailyAverageMinor: Long,
     /** Projected spending at period end, only while the period is in progress. */
     val forecastExpenseMinor: Long?,
+    /** The categories that moved most versus the previous period (empty without a previous period). */
+    val categoryChanges: List<CategoryChange> = emptyList(),
+    /** Day with the most spending (week and month only, when spending happened on more than one day). */
+    val busiestDay: ChartBucket? = null,
 ) {
     /** Change in spending versus the previous period as a fraction (0.12 = 12% more), or null without a baseline. */
     val expenseChange: Double?
@@ -139,10 +152,25 @@ object PeriodReports {
             else -> period.days
         }
         val inProgress = period.contains(today) && period.type != PeriodType.DAY
+        val previousEntries = entries.filter { prev.contains(it.occurredAt, zone) }
+        val previousTotals = LedgerMath.totals(previousEntries)
+
+        val changes = if (previousTotals.expenseMinor == 0L) emptyList() else {
+            val now = expenses.groupBy { it.category ?: "Other" }.mapValues { (_, v) -> v.sumOf { it.amountMinor } }
+            val before = previousEntries.filter(LedgerMath::countsAsExpense).groupBy { it.category ?: "Other" }
+                .mapValues { (_, v) -> v.sumOf { it.amountMinor } }
+            (now.keys + before.keys)
+                .map { CategoryChange(it, now[it] ?: 0L, before[it] ?: 0L) }
+                .filter { kotlin.math.abs(it.deltaMinor) >= MIN_CHANGE_MINOR }
+                .sortedByDescending { kotlin.math.abs(it.deltaMinor) }
+                .take(3)
+        }
+        val busiest = buckets.filter { it.expenseMinor > 0 }.takeIf { it.size > 1 }?.maxByOrNull { it.expenseMinor }
+
         return PeriodReport(
             period = period,
             totals = totals,
-            previousTotals = LedgerMath.totals(entries.filter { prev.contains(it.occurredAt, zone) }),
+            previousTotals = previousTotals,
             expenseCount = expenses.size,
             incomeCount = income.size,
             byCategory = shares(expenses, totals.expenseMinor) { it.category ?: "Other" },
@@ -151,8 +179,13 @@ object PeriodReports {
             largestExpense = expenses.maxByOrNull { it.amountMinor },
             dailyAverageMinor = if (elapsedDays > 0) totals.expenseMinor / elapsedDays else 0L,
             forecastExpenseMinor = if (inProgress && totals.expenseMinor > 0) totals.expenseMinor * period.days / elapsedDays else null,
+            categoryChanges = changes,
+            busiestDay = busiest,
         )
     }
+
+    /** Changes smaller than LKR 500 are noise. */
+    private const val MIN_CHANGE_MINOR = 50_000L
 
     private fun shares(list: List<LedgerEntry>, total: Long, key: (LedgerEntry) -> String): List<CategoryShare> =
         list.groupBy(key).map { (category, items) ->

@@ -42,7 +42,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import lk.expensetracker.data.db.TransactionEntity
 import lk.expensetracker.data.db.displayName
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material3.Icon
+import androidx.compose.ui.text.style.TextOverflow
+import lk.expensetracker.engine.classification.Categories
+import lk.expensetracker.engine.insights.CategoryChange
 import lk.expensetracker.engine.insights.CategoryShare
+import lk.expensetracker.engine.insights.InsightType
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import lk.expensetracker.engine.insights.PeriodReport
 import lk.expensetracker.engine.insights.PeriodType
 import java.time.format.DateTimeFormatter
@@ -107,7 +119,29 @@ fun DashboardScreen(
             return@LazyColumn
         }
 
-        item { StoryCard(r, byId, vm.isCurrentPeriod(period)) }
+        val highlights = highlightsFor(r, byId)
+        if (highlights.isNotEmpty()) {
+            item { SectionTitle("Highlights") }
+            item {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    highlights.forEach { h ->
+                        HighlightTile(h, Modifier.weight(1f)) {
+                            when (val target = h.target) {
+                                is HighlightTarget.Category -> onCategory(target.name)
+                                is HighlightTarget.Transaction -> onOpen(target.id)
+                                is HighlightTarget.Day -> vm.openDay(target.date)
+                            }
+                        }
+                    }
+                    // Keep tiles the same width when there are fewer than three.
+                    repeat(3 - highlights.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+        if (r.categoryChanges.isNotEmpty()) {
+            item { SectionTitle("What changed", subtitle = "Compared with last ${Fmt.periodNoun(period.type)}") }
+            items(r.categoryChanges, key = { "c-" + it.category }) { ChangeRow(it, Fmt.periodNoun(period.type)) { onCategory(it.category) } }
+        }
         if (r.buckets.any { it.expenseMinor > 0 }) item { SpendingChart(r) { day -> vm.openDay(day) } }
 
         item { SectionTitle("Where your money went", subtitle = if (r.byCategory.isEmpty()) null else "Tap a category to see its payments") }
@@ -121,9 +155,11 @@ fun DashboardScreen(
             items(r.incomeByCategory, key = { "i-" + it.category }) { CategoryRow(it, IncomeColor) { onCategory(it.category) } }
         }
 
-        if (vm.isCurrentPeriod(period) && insights.isNotEmpty()) {
+        // Forecast and top merchant are already in the summary card and Highlights; show the rest.
+        val extraInsights = insights.filter { it.type != InsightType.FORECAST && it.type != InsightType.TOP_MERCHANT }
+        if (vm.isCurrentPeriod(period) && extraInsights.isNotEmpty()) {
             item { SectionTitle("Worth knowing") }
-            items(insights.take(3)) { InsightCard(it) }
+            items(extraInsights.take(3)) { InsightCard(it) }
         }
 
         if (inPeriod.isNotEmpty()) {
@@ -164,6 +200,26 @@ private fun SummaryCard(r: PeriodReport, isCurrent: Boolean) {
                     else -> "About the same as last $noun" to MaterialTheme.colorScheme.onPrimaryContainer
                 }
                 Text(text, color = color, fontWeight = FontWeight.Medium)
+
+                // How far through the projected total we are, e.g. "On pace for LKR 51,297 by 30 Nov".
+                r.forecastExpenseMinor?.let { forecast ->
+                    Spacer(Modifier.height(10.dp))
+                    LinearProgressIndicator(
+                        progress = { (r.totals.expenseMinor.toFloat() / forecast).coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth().height(8.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f),
+                        drawStopIndicator = {},
+                        gapSize = 0.dp,
+                    )
+                    val last = r.period.endDateExclusive.minusDays(1).format(DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH))
+                    val vsLast = r.previousTotals.expenseMinor.takeIf { it > 0 }?.let { " · last $noun ${Fmt.rounded(it)}" }.orEmpty()
+                    Text(
+                        "On pace for ${Fmt.rounded(forecast)} by $last$vsLast",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
             }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -181,6 +237,14 @@ private fun SummaryCard(r: PeriodReport, isCurrent: Boolean) {
                     Metric(label, value, if (net >= 0) IncomeColor else ExpenseColor, Modifier.weight(1f))
                 }
             }
+            if (r.totals.internalMinor > 0) {
+                Text(
+                    "${Fmt.rounded(r.totals.internalMinor)} moved between your own accounts, not counted",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+            }
         }
     }
 }
@@ -193,38 +257,76 @@ private fun Metric(label: String, value: String, color: Color, modifier: Modifie
     }
 }
 
-/** A few plain sentences describing the period. */
-@Composable
-private fun StoryCard(r: PeriodReport, byId: Map<Long, TransactionEntity>, isCurrent: Boolean) {
-    val noun = Fmt.periodNoun(r.period.type)
-    val lines = buildList {
-        if (r.expenseCount == 0) {
-            add(if (isCurrent) "No spending recorded this $noun yet." else "No spending recorded in this $noun.")
-        } else {
-            add("You made ${r.expenseCount} payment${if (r.expenseCount == 1) "" else "s"} totalling ${Fmt.money(r.totals.expenseMinor)}.")
-            r.largestExpense?.let { big ->
-                val t = byId[big.id]
-                val day = t?.let { java.time.Instant.ofEpochMilli(it.occurredAt).atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)) }
-                add("The biggest was ${Fmt.money(big.amountMinor)} at ${t?.displayName() ?: "a merchant"}" + (day?.let { " on $it" } ?: "") + ".")
-            }
-            r.byCategory.firstOrNull()?.let { add("Most of it went on ${it.category} (${Fmt.percent(it.share.toDouble())}).") }
-            add("That's about ${Fmt.money(r.dailyAverageMinor)} a day.")
-            r.forecastExpenseMinor?.let {
-                val last = r.period.endDateExclusive.minusDays(1).format(DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH))
-                add("At this pace you'll spend about ${Fmt.rounded(it)} by $last.")
-            }
-        }
-        if (r.totals.incomeMinor > 0) {
-            val top = r.incomeByCategory.firstOrNull()?.category
-            add("${Fmt.money(r.totals.incomeMinor)} came in" + (top?.let { ", mostly $it" } ?: "") + ".")
-        }
-        if (r.totals.internalMinor > 0) add("${Fmt.money(r.totals.internalMinor)} moved between your own accounts and isn't counted.")
+private sealed interface HighlightTarget {
+    data class Category(val name: String) : HighlightTarget
+    data class Transaction(val id: Long) : HighlightTarget
+    data class Day(val date: LocalDate) : HighlightTarget
+}
+
+private data class Highlight(
+    val icon: @Composable () -> Unit,
+    val value: String,
+    val title: String,
+    val detail: String,
+    val target: HighlightTarget,
+)
+
+private val shortDay = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
+
+/** Up to three of the most useful facts about the period, each leading somewhere when tapped. */
+private fun highlightsFor(r: PeriodReport, byId: Map<Long, TransactionEntity>): List<Highlight> = buildList {
+    r.byCategory.firstOrNull { it.category != Categories.OTHER }?.let { top ->
+        add(Highlight({ CategoryIcon(top.category, 32.dp) }, Fmt.rounded(top.amountMinor), top.category, "${Fmt.percent(top.share.toDouble())} of spending", HighlightTarget.Category(top.category)))
     }
-    Card(Modifier.fillMaxWidth().padding(16.dp, 8.dp)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("In short", style = MaterialTheme.typography.titleSmall)
-            lines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+    r.largestExpense?.let { big ->
+        val t = byId[big.id]
+        val day = t?.let { Instant.ofEpochMilli(it.occurredAt).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)) }
+        add(Highlight({ CategoryIcon(big.category ?: Categories.OTHER, 32.dp) }, Fmt.rounded(big.amountMinor), "Biggest payment", listOfNotNull(t?.displayName(), day).joinToString(", "), HighlightTarget.Transaction(big.id)))
+    }
+    r.busiestDay?.let { b ->
+        add(Highlight({ RoundIcon(Icons.Filled.CalendarToday) }, b.period.startDate.format(shortDay), "Busiest day", "${Fmt.rounded(b.expenseMinor)} spent", HighlightTarget.Day(b.period.startDate)))
+    }
+    r.incomeByCategory.firstOrNull()?.let { inc ->
+        add(Highlight({ CategoryIcon(inc.category, 32.dp) }, Fmt.rounded(r.totals.incomeMinor), "Money in", "Mostly ${inc.category}", HighlightTarget.Category(inc.category)))
+    }
+}.take(3)
+
+@Composable
+private fun RoundIcon(icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    val color = MaterialTheme.colorScheme.primary
+    Box(Modifier.size(32.dp).background(color.copy(alpha = 0.16f), CircleShape), contentAlignment = Alignment.Center) {
+        Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+private fun HighlightTile(h: Highlight, modifier: Modifier, onClick: () -> Unit) {
+    Card(modifier.clickable(onClick = onClick)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            h.icon()
+            Text(h.value, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(h.title, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(h.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+@Composable
+private fun ChangeRow(c: CategoryChange, noun: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CategoryIcon(c.category, 32.dp)
+        Spacer(Modifier.width(12.dp))
+        Text(c.category, Modifier.weight(1f), fontWeight = FontWeight.Medium)
+        val (text, color) = when {
+            c.isNew -> "new this $noun · ${Fmt.rounded(c.currentMinor)}" to ExpenseColor
+            c.stopped -> "none this $noun (was ${Fmt.rounded(c.previousMinor)})" to IncomeColor
+            c.deltaMinor > 0 -> "▲ ${Fmt.rounded(c.deltaMinor)} (+${Fmt.percent(c.fraction ?: 0.0)})" to ExpenseColor
+            else -> "▼ ${Fmt.rounded(-c.deltaMinor)} (−${Fmt.percent(c.fraction ?: 0.0)})" to IncomeColor
+        }
+        Text(text, color = color, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
     }
 }
 

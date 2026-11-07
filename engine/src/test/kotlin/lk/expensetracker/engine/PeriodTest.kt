@@ -66,6 +66,12 @@ class PeriodTest {
         assertEquals(listOf("Groceries", "Transport"), r.byCategory.map { it.category })
         assertEquals(0.75f, r.byCategory[0].share)
         assertEquals(2L, r.largestExpense?.id)
+
+        // Groceries 100k → 150k (+50%), Transport new at 50k.
+        assertEquals(listOf("Groceries", "Transport"), r.categoryChanges.map { it.category })
+        assertEquals(0.5, r.categoryChanges[0].fraction!!, 1e-9)
+        assertTrue(r.categoryChanges[1].isNew)
+        assertEquals(LocalDate.parse("2026-11-02"), r.busiestDay?.period?.startDate)
     }
 
     @Test
