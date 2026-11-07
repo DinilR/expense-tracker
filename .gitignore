@@ -1,0 +1,15 @@
+.gradle/
+build/
+local.properties
+.idea/
+.vscode/
+*.iml
+.kotlin/
+captures/
+*.keystore
+*.jks
+keystore.properties
+
+# Personal SMS exports must never be committed
+sms-*.xml
+*.sms.xml

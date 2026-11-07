@@ -1,0 +1,33 @@
+{
+  "id": "boc",
+  "displayName": "Bank of Ceylon",
+  "version": 1,
+  "senderPatterns": ["^BOC$"],
+  "currencyDefault": "LKR",
+  "timezone": "Asia/Colombo",
+  "rules": [
+    {
+      "name": "Transaction with balance",
+      "priority": 10,
+      "pattern": "^(?<type>[A-Za-z/ ]+?)\\s+Rs\\s*(?<amount>[\\d,]+\\.\\d{2})\\s+(?<direction>From|To)\\s+A/C\\s+No\\s+X*(?<account>\\d{3,4})\\.\\s+Balance\\s+available\\s+Rs\\s*(?<balance>[\\d,]+\\.\\d{2})",
+      "directionMap": { "From": "DEBIT", "To": "CREDIT" },
+      "sampleMessages": [
+        "POS/ATM Transaction Rs 220.00 From A/C No XXXXXXXXXX999. Balance available Rs 100184.97 - Thank you for banking with BOC",
+        "Transfer Credit Rs 3414.00 To A/C No XXXXXXXXXX999. Balance available Rs 92378.91 - Thank you for banking with BOC"
+      ]
+    },
+    {
+      "name": "Marketing / notices (anything that is not a transaction)",
+      "priority": 99,
+      "ignore": true,
+      "pattern": "^(?![\\s\\S]*Rs\\s*[\\d,]+\\.\\d{2}[\\s\\S]*A/C)"
+    }
+  ],
+  "classification": [
+    { "field": "type", "match": "^POS/ATM", "channel": "POS" },
+    { "field": "type", "match": "(?i)transfer", "direction": "DEBIT",  "kind": "TRANSFER_OUT", "channel": "TRANSFER" },
+    { "field": "type", "match": "(?i)transfer", "direction": "CREDIT", "kind": "TRANSFER_IN",  "channel": "TRANSFER" },
+    { "field": "type", "match": "^Online", "channel": "ONLINE" },
+    { "field": "type", "match": "(?i)ATM Withdrawal|Cash Withdrawal", "kind": "CASH_WITHDRAWAL", "channel": "ATM", "category": "Cash" }
+  ]
+}

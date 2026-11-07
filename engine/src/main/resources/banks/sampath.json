@@ -1,0 +1,42 @@
+{
+  "id": "sampath",
+  "displayName": "Sampath Bank",
+  "version": 1,
+  "senderPatterns": ["^SAMPATHTXN$"],
+  "currencyDefault": "LKR",
+  "timezone": "Asia/Colombo",
+  "rules": [
+    {
+      "name": "Promotion",
+      "priority": 1,
+      "ignore": true,
+      "pattern": "(?i)Thagi Wasi|Monthly Draw|Grand Draw"
+    },
+    {
+      "name": "Debit / Credit",
+      "priority": 10,
+      "pattern": "^(?<currency>[A-Z]{3})\\s+(?<amount>[\\d,]+\\.\\d{2})\\s+(?<direction>credited|debited)\\s+(?:to|from)\\s+AC\\s+\\*+(?<account>\\d{3,4})\\s+(?:via\\s+(?<channel>POS|ATM)\\s+at|for)\\s+(?<merchant>[^\\r\\n]+?)\\s*\\r?\\n(?:\\s*(?<date>\\d{2}/\\d{2}/\\d{4}\\s+\\d{2}:\\d{2}:\\d{2}))?",
+      "directionMap": { "debited": "DEBIT", "credited": "CREDIT" },
+      "dateFormat": "dd/MM/yyyy HH:mm:ss",
+      "merchantCleanup": ["\\s+\\d{8}$", "-\\d{9,}$", "[\\s(]+$"],
+      "sampleMessages": [
+        "LKR 2,649.36 debited from AC **1234 via POS at KEELLS SUPER - PILIYANDAL 80401775\n07/11/2026 14:05:58\nTo Inq Call 0112303050\nGet protected -Do not Share OTP",
+        "LKR 5,000.00 debited from AC **1234 via POS at CHARITH FILLING STATION ( 37009935\n- For Inq Call 0112 303050, Sampath Bank",
+        "LKR 1,373.68 credited to AC **1234 for eCom/REV UBER 99999999\n12/03/2026 23:48:13\nTo Inq Call 0112303050\nGet protected -Do not Share OTP"
+      ]
+    }
+  ],
+  "classification": [
+    { "field": "channel",  "match": "^OTHER$", "direction": "DEBIT",  "kind": "TRANSFER_OUT", "channel": "TRANSFER" },
+    { "field": "channel",  "match": "^OTHER$", "direction": "CREDIT", "kind": "TRANSFER_IN",  "channel": "TRANSFER" },
+    { "field": "merchant", "match": "^eCom\\s", "kind": "EXPENSE", "channel": "ONLINE" },
+    { "field": "merchant", "match": "^(eCom/)?REV\\b", "direction": "CREDIT", "kind": "REVERSAL", "channel": "ONLINE" },
+    { "field": "channel",  "match": "^ATM$", "kind": "CASH_WITHDRAWAL", "category": "Cash" },
+    { "field": "merchant", "match": "(?i)^(SET_QUA_CHRG|FEE?:)", "kind": "FEE", "channel": "OTHER", "category": "Bank charges" },
+    { "field": "merchant", "match": "(?i)^Interest:", "kind": "INCOME", "channel": "OTHER", "category": "Interest" },
+    { "field": "merchant", "match": "^SLIPS", "direction": "CREDIT", "kind": "INCOME", "category": "Salary" },
+    { "field": "merchant", "match": "^CB REM", "direction": "CREDIT", "kind": "INCOME", "category": "Remittance" },
+    { "field": "merchant", "match": "(?i)^Fixed dp", "kind": "INTERNAL_TRANSFER", "category": "Savings" },
+    { "field": "merchant", "match": "^TFR\\s", "direction": "DEBIT", "kind": "TRANSFER_OUT", "channel": "ONLINE" }
+  ]
+}

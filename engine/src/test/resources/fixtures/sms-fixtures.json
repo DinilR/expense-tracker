@@ -1,0 +1,121 @@
+[
+  { "name": "Sampath POS (current layout)", "sender": "SAMPATHTXN",
+    "body": "LKR 2,649.36 debited from AC **1234 via POS at KEELLS SUPER - PILIYANDAL 80401775\n07/11/2026 14:05:58\nTo Inq Call 0112303050\nGet protected -Do not Share OTP",
+    "expect": { "result": "parsed", "bankId": "sampath", "amountMinor": 264936, "direction": "DEBIT", "kind": "EXPENSE", "channel": "POS",
+      "merchant": "KEELLS SUPER - PILIYANDAL", "merchantKey": "KEELLS SUPER", "account": "1234", "category": "Groceries",
+      "occurredAt": "2026-11-07T14:05:58", "timeSource": "SMS_TEXT" } },
+
+  { "name": "Sampath POS (older layout, no date)", "sender": "SAMPATHTXN",
+    "body": "LKR 5,000.00 debited from AC **1234 via POS at CHARITH FILLING STATION ( 37009935\n- For Inq Call 0112 303050, Sampath Bank",
+    "expect": { "result": "parsed", "bankId": "sampath", "amountMinor": 500000, "direction": "DEBIT", "kind": "EXPENSE", "channel": "POS",
+      "merchant": "CHARITH FILLING STATION", "merchantKey": "CHARITH FILLING STATION", "category": "Fuel", "timeSource": "SMS_RECEIVED" } },
+
+  { "name": "Sampath ATM (current layout)", "sender": "SAMPATHTXN",
+    "body": "LKR 10,030.00 debited from AC **1234 via ATM at KOHUWALA-CRM1 BR CASH SET\n20/03/2026 21:01:25\nTo Inq Call 0112303050\nGet protected -Do not Share OTP",
+    "expect": { "result": "parsed", "amountMinor": 1003000, "direction": "DEBIT", "kind": "CASH_WITHDRAWAL", "channel": "ATM",
+      "merchant": "KOHUWALA-CRM1 BR CASH SET", "category": "Cash", "occurredAt": "2026-03-20T21:01:25", "timeSource": "SMS_TEXT" } },
+
+  { "name": "Sampath ATM (older layout)", "sender": "SAMPATHTXN",
+    "body": "LKR 17,005.00 debited from AC **1234 via ATM at PILIYANDALA BRANCH CASH SET\n- For Inq Call 0112 303050, Sampath Bank",
+    "expect": { "result": "parsed", "amountMinor": 1700500, "kind": "CASH_WITHDRAWAL", "channel": "ATM", "category": "Cash", "timeSource": "SMS_RECEIVED" } },
+
+  { "name": "Sampath eCom payment", "sender": "SAMPATHTXN",
+    "body": "LKR 5,923.00 debited from AC **1234 for eCom UBER EATS 99999999\n12/03/2026 20:10:00\nTo Inq Call 0112303050\nGet protected -Do not Share OTP",
+    "expect": { "result": "parsed", "amountMinor": 592300, "direction": "DEBIT", "kind": "EXPENSE", "channel": "ONLINE",
+      "merchant": "eCom UBER EATS", "merchantKey": "UBER EATS", "category": "Dining & food delivery" } },
+
+  { "name": "Sampath eCom payment (Google, reference stripped from key)", "sender": "SAMPATHTXN",
+    "body": "LKR 2,189.81 debited from AC **1234 for eCom Google ADS3129412472 99999999\n- For Inq Call 0112 303050, Sampath Bank",
+    "expect": { "result": "parsed", "amountMinor": 218981, "kind": "EXPENSE", "channel": "ONLINE", "merchantKey": "GOOGLE", "category": "Subscriptions & digital" } },
+
+  { "name": "Sampath eCom/REV reversal", "sender": "SAMPATHTXN",
+    "body": "LKR 1,373.68 credited to AC **1234 for eCom/REV UBER 99999999\n12/03/2026 23:48:13\nTo Inq Call 0112303050\nGet protected -Do not Share OTP",
+    "expect": { "result": "parsed", "amountMinor": 137368, "direction": "CREDIT", "kind": "REVERSAL", "channel": "ONLINE",
+      "merchant": "eCom/REV UBER", "merchantKey": "UBER", "category": "Refunds" } },
+
+  { "name": "Sampath REV <code> reversal", "sender": "SAMPATHTXN",
+    "body": "LKR 3,550.00 credited to AC **1234 for REV 0612 UBER EATS\n- For Inq Call 0112 303050, Sampath Bank",
+    "expect": { "result": "parsed", "amountMinor": 355000, "direction": "CREDIT", "kind": "REVERSAL", "merchantKey": "UBER EATS" } },
+
+  { "name": "Sampath TFR online transfer", "sender": "SAMPATHTXN",
+    "body": "LKR 18,200.00 debited from AC **1234 for TFR Friend earbuds-000052050167\n01/05/2026 10:00:00\nTo Inq Call 0112303050\nGet protected -Do not Share OTP",
+    "expect": { "result": "parsed", "amountMinor": 1820000, "kind": "TRANSFER_OUT", "channel": "ONLINE", "merchant": "TFR Friend earbuds",
+      "merchantKey": "FRIEND EARBUDS", "category": "Transfers out" } },
+
+  { "name": "Sampath free-text debit (transfer to payee)", "sender": "SAMPATHTXN",
+    "body": "LKR 1,500.00 debited from AC **1234 for payee note\n- For Inq Call 0112 303050, Sampath Bank",
+    "expect": { "result": "parsed", "kind": "TRANSFER_OUT", "channel": "TRANSFER", "category": "Transfers out" } },
+
+  { "name": "Sampath quarterly charge", "sender": "SAMPATHTXN",
+    "body": "LKR 75.00 debited from AC **1234 for SET_QUA_CHRG_202511_8980\n- For Inq Call 0112 303050, Sampath Bank",
+    "expect": { "result": "parsed", "amountMinor": 7500, "kind": "FEE", "category": "Bank charges" } },
+
+  { "name": "Sampath SMS alert fee", "sender": "SAMPATHTXN",
+    "body": "LKR 500.00 debited from AC **1234 for Fee: SMS_Alerts_202605_0704145651\n01/06/2026 09:00:00\nTo Inq Call 0112303050",
+    "expect": { "result": "parsed", "amountMinor": 50000, "kind": "FEE", "category": "Bank charges" } },
+
+  { "name": "Sampath interest credit", "sender": "SAMPATHTXN",
+    "body": "LKR 133.51 credited to AC **1234 for Interest: 1xxx1234:Int.Pd:20-02-2026 to 19-03-2026\n21/03/2026 04:31:57\nTo Inq Call 0112303050",
+    "expect": { "result": "parsed", "amountMinor": 13351, "direction": "CREDIT", "kind": "INCOME", "category": "Interest", "occurredAt": "2026-03-21T04:31:57" } },
+
+  { "name": "Sampath salary (SLIPS)", "sender": "SAMPATHTXN",
+    "body": "LKR 281,908.92 credited to AC **1234 for SLIPS--ACME EMPLOYER LTD\n23/10/2026 12:23:03\nTo Inq Call 0112303050\nGet protected -Do not Share OTP",
+    "expect": { "result": "parsed", "amountMinor": 28190892, "direction": "CREDIT", "kind": "INCOME", "category": "Salary", "occurredAt": "2026-10-23T12:23:03" } },
+
+  { "name": "Sampath remittance", "sender": "SAMPATHTXN",
+    "body": "LKR 10,000.00 credited to AC **1234 for CB REM 123456\n- For Inq Call 0112 303050, Sampath Bank",
+    "expect": { "result": "parsed", "kind": "INCOME", "category": "Remittance" } },
+
+  { "name": "Sampath money received from a person", "sender": "SAMPATHTXN",
+    "body": "LKR 522.00 credited to AC **1234 for friend- payback\n- For Inq Call 0112 303050, Sampath Bank",
+    "expect": { "result": "parsed", "amountMinor": 52200, "direction": "CREDIT", "kind": "TRANSFER_IN", "channel": "TRANSFER", "category": "Transfers in" } },
+
+  { "name": "Sampath fixed deposit", "sender": "SAMPATHTXN",
+    "body": "LKR 249,925.00 debited from AC **1234 for Fixed dp\n- For Inq Call 0112 303050, Sampath Bank",
+    "expect": { "result": "parsed", "amountMinor": 24992500, "kind": "INTERNAL_TRANSFER", "category": "Savings" } },
+
+  { "name": "Sampath promotion", "sender": "SAMPATHTXN",
+    "body": "You have earned 1 entry to the Monthly Draw and 5 entry to the Grand Draw in the \"Sampath Debit Thagi Wasi\" promotion by using your Sampath Debit Card for in-store and Online purchases. Spend Rs. 526.90 more to earn your next entry. Visit www.sampath.lk for details.",
+    "expect": { "result": "ignored", "bankId": "sampath" } },
+
+  { "name": "BOC POS/ATM", "sender": "BOC",
+    "body": "POS/ATM Transaction Rs 220.00 From A/C No XXXXXXXXXX999. Balance available Rs 100184.97 - Thank you for banking with BOC",
+    "expect": { "result": "parsed", "bankId": "boc", "amountMinor": 22000, "direction": "DEBIT", "kind": "EXPENSE", "channel": "POS",
+      "account": "999", "balanceMinor": 10018497, "type": "POS/ATM Transaction", "category": "Other", "timeSource": "SMS_RECEIVED" } },
+
+  { "name": "BOC Transfer Credit", "sender": "BOC",
+    "body": "Transfer Credit Rs 3414.00 To A/C No XXXXXXXXXX999. Balance available Rs 92378.91 - Thank you for banking with BOC",
+    "expect": { "result": "parsed", "amountMinor": 341400, "direction": "CREDIT", "kind": "TRANSFER_IN", "channel": "TRANSFER", "category": "Transfers in" } },
+
+  { "name": "BOC Online Transfer Credit", "sender": "BOC",
+    "body": "Online Transfer Credit Rs 3372.00 To A/C No XXXXXXXXXX999. Balance available Rs 88783.97 - Thank you for banking with BOC",
+    "expect": { "result": "parsed", "direction": "CREDIT", "kind": "TRANSFER_IN", "channel": "ONLINE" } },
+
+  { "name": "BOC CEFT Transfer Debit", "sender": "BOC",
+    "body": "CEFT Transfer Debit Rs 15025.00 From A/C No XXXXXXXXXX999. Balance available Rs 486914.14 - Thank you for banking with BOC",
+    "expect": { "result": "parsed", "amountMinor": 1502500, "direction": "DEBIT", "kind": "TRANSFER_OUT", "channel": "TRANSFER" } },
+
+  { "name": "BOC Online Transfer Debit", "sender": "BOC",
+    "body": "Online Transfer Debit Rs 5000.00 From A/C No XXXXXXXXXX999. Balance available Rs 140249.05 - Thank you for banking with BOC",
+    "expect": { "result": "parsed", "kind": "TRANSFER_OUT", "channel": "ONLINE" } },
+
+  { "name": "BOC ATM Withdrawal", "sender": "BOC",
+    "body": "ATM Withdrawal Rs 200000.00 From A/C No XXXXXXXXXX999. Balance available Rs 337695.77 - Thank you for banking with BOC",
+    "expect": { "result": "parsed", "amountMinor": 20000000, "kind": "CASH_WITHDRAWAL", "channel": "ATM", "category": "Cash" } },
+
+  { "name": "BOC Cash Withdrawal Without Book", "sender": "BOC",
+    "body": "Cash Withdrawal Without Book Rs 500000.00 From A/C No XXXXXXXXXX999. Balance available Rs 6868.80 - Thank you for banking with BOC",
+    "expect": { "result": "parsed", "amountMinor": 50000000, "kind": "CASH_WITHDRAWAL", "balanceMinor": 686880 } },
+
+  { "name": "BOC marketing", "sender": "BOC",
+    "body": "Switch to BOC Flex now and enjoy our new mobile banking experience with enhanced features & security. Download today from Play Store, App Store and Huawei App Gallery.",
+    "expect": { "result": "ignored", "bankId": "boc" } },
+
+  { "name": "BOC unknown transaction format goes to review", "sender": "BOC",
+    "body": "Debit card payment of Rs 500.00 declined on A/C ending 999",
+    "expect": { "result": "unrecognized", "bankId": "boc" } },
+
+  { "name": "Unknown sender", "sender": "+94771234567",
+    "body": "Hi, are we still meeting at 5?",
+    "expect": { "result": "unrecognized" } }
+]
